@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <limits.h>
 
 #include "redshift.h"
 
@@ -284,6 +285,29 @@ interpolate_color(float a, const float *c1, const float *c2, float *c)
 /* Helper macro used in the fill functions */
 #define F(Y, C)  pow((Y) * setting->brightness * \
 		     white_point[C], 1.0/setting->gamma[C])
+
+uint16_t
+colorramp_gamma_2_temp(uint16_t gamma_r, uint16_t gamma_g, uint16_t gamma_b)
+{
+	/* Find nearest row in blackbody table for given gamma
+	(assuming the three gamma values conform in shape to one of the rows) */
+	uint16_t gamma[] = {gamma_r, gamma_g, gamma_b};
+	uint16_t min_diff = USHRT_MAX;
+	int min_i = -1;
+	uint16_t diff;
+	const int rows = sizeof(blackbody_color) / 3 / sizeof(float);
+	for (int i = 0; i < rows; i++) {
+		diff = 0;
+		for (int j = 0; j < 3; j++)
+			diff += abs(blackbody_color[i * 3 + j]*256 - gamma[j]);
+		if (diff < min_diff) {
+			min_diff = diff;
+			min_i = i;
+		}
+	}
+	/* Return estimate of temperature */
+	return min_i * 100 + 1000;
+}
 
 void
 colorramp_fill(uint16_t *gamma_r, uint16_t *gamma_g, uint16_t *gamma_b,

@@ -52,6 +52,7 @@ int randr_init(randr_state_t *state);
 int randr_start(randr_state_t *state);
 void randr_free(randr_state_t *state);
 
+int randr_dump(randr_state_t *state, color_setting_t *color);
 void randr_print_help(FILE *f);
 int randr_set_mode(randr_state_t *state,
 			const program_mode_t mode);

@@ -228,6 +228,32 @@ randr_start(randr_state_t *state)
 	return 0;
 }
 
+int randr_get_crtc_gammas(randr_state_t *state, int crtc_num, uint16_t **gamma_r, uint16_t **gamma_g, uint16_t **gamma_b)
+{
+	xcb_generic_error_t *error;
+	xcb_randr_crtc_t crtc = state->crtcs[crtc_num].crtc;
+	unsigned int ramp_size = state->crtcs[crtc_num].ramp_size;
+	/* Request current gamma ramps */
+	xcb_randr_get_crtc_gamma_cookie_t gamma_get_cookie =
+		xcb_randr_get_crtc_gamma(state->conn, crtc);
+	xcb_randr_get_crtc_gamma_reply_t *gamma_get_reply =
+		xcb_randr_get_crtc_gamma_reply(state->conn,
+					       gamma_get_cookie, &error);
+
+	if (error) {
+		fprintf(stderr, _("`%s' returned error %d\n"),
+			"RANDR Get CRTC Gamma", error->error_code);
+		return -1;
+	}
+
+	*gamma_r = xcb_randr_get_crtc_gamma_red(gamma_get_reply);
+	*gamma_g = xcb_randr_get_crtc_gamma_green(gamma_get_reply);
+	*gamma_b = xcb_randr_get_crtc_gamma_blue(gamma_get_reply);
+
+	free(gamma_get_reply);
+	return 0;
+}
+
 void
 randr_restore(randr_state_t *state)
 {
@@ -269,6 +295,18 @@ randr_free(randr_state_t *state)
 
 	/* Close connection */
 	xcb_disconnect(state->conn);
+}
+
+int randr_dump(randr_state_t *state, color_setting_t *color)
+{
+	printf("in dump\n");
+	uint16_t *r, *g, *b;
+	randr_get_crtc_gammas(state, 0, &r, &g, &b);
+	color->gamma[0] = r[1] / 256.0;
+	color->gamma[1] = g[1] / 256.0;
+	color->gamma[2] = b[1] / 256.0;
+	color->temperature = colorramp_gamma_2_temp(r[1], g[1], b[1]);
+	return 0;
 }
 
 void
