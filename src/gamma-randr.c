@@ -299,13 +299,12 @@ randr_free(randr_state_t *state)
 
 int randr_dump(randr_state_t *state, color_setting_t *color)
 {
-	printf("in dump\n");
 	uint16_t *r, *g, *b;
 	randr_get_crtc_gammas(state, 0, &r, &g, &b);
 	color->gamma[0] = r[1] / 256.0;
 	color->gamma[1] = g[1] / 256.0;
 	color->gamma[2] = b[1] / 256.0;
-	color->temperature = colorramp_gamma_2_temp(r[1], g[1], b[1]);
+	color->temperature = colorramp_gamma_2_temp(color);
 	return 0;
 }
 

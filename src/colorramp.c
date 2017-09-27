@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <limits.h>
+#include <float.h>
 
 #include "redshift.h"
 
@@ -286,25 +287,39 @@ interpolate_color(float a, const float *c1, const float *c2, float *c)
 #define F(Y, C)  pow((Y) * setting->brightness * \
 		     white_point[C], 1.0/setting->gamma[C])
 
+#define MAX(A,B) (A > B ? A : B)
+
+/* Find row that corresponds most nearly to gamma. We do not seek the row whose RBG value is nearest the arguments but rather that whose ratios between R:G and G:B are nearest those ratios for the arguments. */
 uint16_t
-colorramp_gamma_2_temp(uint16_t gamma_r, uint16_t gamma_g, uint16_t gamma_b)
+colorramp_gamma_2_temp(color_setting_t *color)
 {
-	/* Find nearest row in blackbody table for given gamma
-	(assuming the three gamma values conform in shape to one of the rows) */
-	uint16_t gamma[] = {gamma_r, gamma_g, gamma_b};
-	uint16_t min_diff = USHRT_MAX;
+	double arg_rg_ratio = MAX(0.000001, color->gamma[0]) * 1.0 / MAX(0.000001, color->gamma[1]);
+	double arg_gb_ratio = MAX(0.000001, color->gamma[1]) * 1.0 / MAX(0.000001, color->gamma[2]);
+
+	double min_diff = DBL_MAX;
 	int min_i = -1;
-	uint16_t diff;
+	double diff;
+
 	const int rows = sizeof(blackbody_color) / 3 / sizeof(float);
-	for (int i = 0; i < rows; i++) {
-		diff = 0;
-		for (int j = 0; j < 3; j++)
-			diff += abs(blackbody_color[i * 3 + j]*256 - gamma[j]);
+	for (int row = 0; row < rows; row++) {
+		double r = MAX(0.000001, blackbody_color[row*3 + 0]);
+		double g = MAX(0.000001, blackbody_color[row*3 + 1]);
+		double b = MAX(0.000001, blackbody_color[row*3 + 2]);
+		diff = abs(arg_rg_ratio - r/g + arg_gb_ratio - g/b);
 		if (diff < min_diff) {
 			min_diff = diff;
-			min_i = i;
+			min_i = row;
 		}
+		#if 0
+		printf("%10.8lf %10.8lf : %8.6lf %8.6lf %8.6lf %8.6lf\n", min_diff, diff, arg_rg_ratio, arg_rg_ratio - r/g, arg_gb_ratio, arg_gb_ratio - g/b);
+		#endif
 	}
+	/* Calculate bright which could have been set with the -b option */
+	double rbright = color->gamma[0] / MAX(0.000001, blackbody_color[min_i*3 + 0]);
+	double gbright = color->gamma[1] / MAX(0.000001, blackbody_color[min_i*3 + 1]);
+	double bbright = color->gamma[2] / MAX(0.000001, blackbody_color[min_i*3 + 2]);
+	color->brightness = (rbright + gbright + bbright) / 3;
+
 	/* Return estimate of temperature */
 	return min_i * 100 + 1000;
 }
