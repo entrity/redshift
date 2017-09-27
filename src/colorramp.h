@@ -28,6 +28,6 @@ void colorramp_fill(uint16_t *gamma_r, uint16_t *gamma_g, uint16_t *gamma_b,
 		    int size, const color_setting_t *setting);
 void colorramp_fill_float(float *gamma_r, float *gamma_g, float *gamma_b,
 			  int size, const color_setting_t *setting);
-uint16_t colorramp_gamma_2_temp(uint16_t gamma_r, uint16_t gamma_g, uint16_t gamma_b);
+uint16_t colorramp_gamma_2_temp(color_setting_t *color);
 
 #endif /* ! REDSHIFT_COLORRAMP_H */

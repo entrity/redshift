@@ -305,7 +305,7 @@ int randr_dump(randr_state_t *state, color_setting_t *color)
 	color->gamma[0] = r[1] / 256.0;
 	color->gamma[1] = g[1] / 256.0;
 	color->gamma[2] = b[1] / 256.0;
-	color->temperature = colorramp_gamma_2_temp(r[1], g[1], b[1]);
+	color->temperature = colorramp_gamma_2_temp(color);
 	return 0;
 }
 

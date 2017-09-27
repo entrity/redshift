@@ -1832,7 +1832,7 @@ main(int argc, char *argv[])
 			method->dump(&state, &color);
 			printf("%16s\t%lf\t%lf\t%lf\n", "Gamma", color.gamma[0], color.gamma[1], color.gamma[2]);
 			printf("%16s\t%u\n", "Temperature", color.temperature);
-			printf("%16s\t%s\n", "Bright", "not implemented");
+			printf("%16s\t%lf\n", "Bright", color.brightness);
 		} else {
 			fprintf(stderr, "No dump method has been implemented for"
 					" your gamma method: %s\n", gamma_methods[0].name);
