@@ -135,7 +135,9 @@ static const gamma_method_t gamma_methods[] = {
 		(gamma_method_init_func *)drm_init,
 		(gamma_method_start_func *)drm_start,
 		(gamma_method_free_func *)drm_free,
+		NULL,
 		(gamma_method_print_help_func *)drm_print_help,
+		(gamma_method_set_mode_func *)drm_set_mode,
 		(gamma_method_set_option_func *)drm_set_option,
 		(gamma_method_restore_func *)drm_restore,
 		(gamma_method_set_temperature_func *)drm_set_temperature
@@ -147,7 +149,9 @@ static const gamma_method_t gamma_methods[] = {
 		(gamma_method_init_func *)randr_init,
 		(gamma_method_start_func *)randr_start,
 		(gamma_method_free_func *)randr_free,
+		(gamma_method_dump_func *)randr_dump,
 		(gamma_method_print_help_func *)randr_print_help,
+		(gamma_method_set_mode_func *)randr_set_mode,
 		(gamma_method_set_option_func *)randr_set_option,
 		(gamma_method_restore_func *)randr_restore,
 		(gamma_method_set_temperature_func *)randr_set_temperature
@@ -159,7 +163,9 @@ static const gamma_method_t gamma_methods[] = {
 		(gamma_method_init_func *)vidmode_init,
 		(gamma_method_start_func *)vidmode_start,
 		(gamma_method_free_func *)vidmode_free,
+		NULL,
 		(gamma_method_print_help_func *)vidmode_print_help,
+		(gamma_method_set_mode_func *)vidmode_set_mode,
 		(gamma_method_set_option_func *)vidmode_set_option,
 		(gamma_method_restore_func *)vidmode_restore,
 		(gamma_method_set_temperature_func *)vidmode_set_temperature
@@ -171,7 +177,9 @@ static const gamma_method_t gamma_methods[] = {
 		(gamma_method_init_func *)quartz_init,
 		(gamma_method_start_func *)quartz_start,
 		(gamma_method_free_func *)quartz_free,
+		NULL,
 		(gamma_method_print_help_func *)quartz_print_help,
+		(gamma_method_set_mode_func *)quartz_set_mode,
 		(gamma_method_set_option_func *)quartz_set_option,
 		(gamma_method_restore_func *)quartz_restore,
 		(gamma_method_set_temperature_func *)quartz_set_temperature
@@ -183,7 +191,9 @@ static const gamma_method_t gamma_methods[] = {
 		(gamma_method_init_func *)w32gdi_init,
 		(gamma_method_start_func *)w32gdi_start,
 		(gamma_method_free_func *)w32gdi_free,
+		NULL,
 		(gamma_method_print_help_func *)w32gdi_print_help,
+		(gamma_method_set_mode_func *)w32gdi_set_mode,
 		(gamma_method_set_option_func *)w32gdi_set_option,
 		(gamma_method_restore_func *)w32gdi_restore,
 		(gamma_method_set_temperature_func *)w32gdi_set_temperature
@@ -194,7 +204,9 @@ static const gamma_method_t gamma_methods[] = {
 		(gamma_method_init_func *)gamma_dummy_init,
 		(gamma_method_start_func *)gamma_dummy_start,
 		(gamma_method_free_func *)gamma_dummy_free,
+		NULL,
 		(gamma_method_print_help_func *)gamma_dummy_print_help,
+		(gamma_method_set_mode_func *)gamma_dummy_set_mode,
 		(gamma_method_set_option_func *)gamma_dummy_set_option,
 		(gamma_method_restore_func *)gamma_dummy_restore,
 		(gamma_method_set_temperature_func *)gamma_dummy_set_temperature
@@ -294,15 +306,6 @@ static const location_provider_t location_providers[] = {
 
 /* Length of fade in numbers of short sleep durations. */
 #define FADE_LENGTH  40
-
-/* Program modes. */
-typedef enum {
-	PROGRAM_MODE_CONTINUAL,
-	PROGRAM_MODE_ONE_SHOT,
-	PROGRAM_MODE_PRINT,
-	PROGRAM_MODE_RESET,
-	PROGRAM_MODE_MANUAL
-} program_mode_t;
 
 /* Transition scheme.
    The solar elevations at which the transition begins/ends,
@@ -484,6 +487,7 @@ print_help(const char *program_name)
 		" color temperature)\n"
 		"  -O TEMP\tOne shot manual mode (set color temperature)\n"
 		"  -p\t\tPrint mode (only print parameters and exit)\n"
+		"  -d\t\tDump mode (only print current levels and exit)\n"
 		"  -x\t\tReset mode (remove adjustment from screen)\n"
 		"  -r\t\tDisable fading between color temperatures\n"
 		"  -t DAY:NIGHT\tColor temperature to set at daytime/night\n"),
@@ -1219,12 +1223,15 @@ main(int argc, char *argv[])
 
 	/* Parse command line arguments. */
 	int opt;
-	while ((opt = getopt(argc, argv, "b:c:g:hl:m:oO:prt:vVx")) != -1) {
+	while ((opt = getopt(argc, argv, "b:c:dg:hl:m:oO:prt:vVx")) != -1) {
 		switch (opt) {
 		case 'b':
 			parse_brightness_string(optarg,
 						&scheme.day.brightness,
 						&scheme.night.brightness);
+			break;
+		case 'd':
+			mode = PROGRAM_MODE_DUMP;
 			break;
 		case 'c':
 			free(config_filepath);
@@ -1538,6 +1545,7 @@ main(int argc, char *argv[])
 
 	/* Location is not needed for reset mode and manual mode. */
 	if (mode != PROGRAM_MODE_RESET &&
+		mode != PROGRAM_MODE_DUMP &&
 	    mode != PROGRAM_MODE_MANUAL) {
 		if (provider != NULL) {
 			/* Use provider specified on command line. */
@@ -1689,6 +1697,13 @@ main(int argc, char *argv[])
 		}
 	}
 
+	r = method->set_mode(&state, mode);
+	if (r < 0) {
+		fprintf(stderr, _("Setting of mode failed for %s.\n"),
+					method->name);
+		return -1;
+	}
+
 	config_ini_free(&config_state);
 
 	switch (mode) {
@@ -1811,6 +1826,19 @@ main(int argc, char *argv[])
 		}
 	}
 	break;
+	case PROGRAM_MODE_DUMP:
+		if (method->dump) {
+			color_setting_t color;
+			method->dump(&state, &color);
+			printf("%16s\t%lf\t%lf\t%lf\n", "Gamma", color.gamma[0], color.gamma[1], color.gamma[2]);
+			printf("%16s\t%u\n", "Temperature", color.temperature);
+			printf("%16s\t%lf\n", "Bright", color.brightness);
+		} else {
+			fprintf(stderr, "No dump method has been implemented for"
+					" your gamma method: %s\n", gamma_methods[0].name);
+			exit(EXIT_FAILURE);
+		}
+	break;
 	case PROGRAM_MODE_CONTINUAL:
 	{
 		r = run_continual_mode(provider, &location_state, &scheme,
@@ -1828,6 +1856,7 @@ main(int argc, char *argv[])
 
 	/* Clean up location provider state */
 	if (mode != PROGRAM_MODE_RESET &&
+		mode != PROGRAM_MODE_DUMP &&
 	    mode != PROGRAM_MODE_MANUAL) {
 		provider->free(&location_state);
 	}

@@ -38,6 +38,16 @@ typedef enum {
 	PERIOD_TRANSITION
 } period_t;
 
+/* Program modes. */
+typedef enum {
+	PROGRAM_MODE_CONTINUAL,
+	PROGRAM_MODE_DUMP,
+	PROGRAM_MODE_ONE_SHOT,
+	PROGRAM_MODE_PRINT,
+	PROGRAM_MODE_RESET,
+	PROGRAM_MODE_MANUAL
+} program_mode_t;
+
 /* Color setting */
 typedef struct {
 	int temperature;
@@ -50,7 +60,9 @@ typedef struct {
 typedef int gamma_method_init_func(void *state);
 typedef int gamma_method_start_func(void *state);
 typedef void gamma_method_free_func(void *state);
+typedef void gamma_method_dump_func(void *state, color_setting_t *);
 typedef void gamma_method_print_help_func(FILE *f);
+typedef int gamma_method_set_mode_func(void *state, const program_mode_t mode);
 typedef int gamma_method_set_option_func(void *state, const char *key,
 					 const char *value);
 typedef void gamma_method_restore_func(void *state);
@@ -70,8 +82,12 @@ typedef struct {
 	/* Free all allocated storage and close connections. */
 	gamma_method_free_func *free;
 
+	/* Get current levels. */
+	gamma_method_dump_func *dump;
 	/* Print help on options for this adjustment method. */
 	gamma_method_print_help_func *print_help;
+	/* Set program mode. Used to set state->preserve for many gamma modules. */
+	gamma_method_set_mode_func *set_mode;
 	/* Set an option key, value-pair */
 	gamma_method_set_option_func *set_option;
 
@@ -112,6 +128,5 @@ typedef struct {
 	location_provider_get_fd_func *get_fd;
 	location_provider_handle_func *handle;
 } location_provider_t;
-
 
 #endif /* ! REDSHIFT_REDSHIFT_H */
